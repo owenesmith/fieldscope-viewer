@@ -1,0 +1,1294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>FieldScope — Charleston Field Research</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root {
+  --bg-primary: #0F1215;
+  --bg-secondary: #181C20;
+  --bg-card: #1E2328;
+  --bg-hover: #252A30;
+  --text-primary: #E8E4DF;
+  --text-secondary: #9B9590;
+  --text-muted: #5E5955;
+  --accent-ansonborough: #D4613E;
+  --accent-french: #C27BA0;
+  --accent-market: #D4A03E;
+  --accent-gadsdenboro: #3E9B8F;
+  --accent-highlight: #E8C06A;
+  --border: #2A2E33;
+  --border-subtle: #1F2327;
+  --shadow: 0 4px 24px rgba(0,0,0,0.4);
+  --radius: 10px;
+  --radius-sm: 6px;
+  --radius-lg: 16px;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* ─── LAYOUT ─────────────────────────────────── */
+.app {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  grid-template-rows: 1fr;
+  height: 100vh;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .app {
+    grid-template-columns: 1fr;
+    grid-template-rows: 55vh 45vh;
+  }
+  .sidebar { order: 2; overflow-y: auto; }
+  .map-container { order: 1; }
+}
+
+/* ─── SIDEBAR ────────────────────────────────── */
+.sidebar {
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  padding: 24px 20px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.logo {
+  font-family: 'Playfair Display', serif;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--text-primary);
+}
+
+.logo-sub {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.sidebar-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  padding: 0 12px;
+}
+
+.sidebar-tab {
+  flex: 1;
+  padding: 12px 4px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.sidebar-tab:hover { color: var(--text-secondary); }
+.sidebar-tab.active {
+  color: var(--accent-highlight);
+  border-bottom-color: var(--accent-highlight);
+}
+
+.sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.sidebar-content::-webkit-scrollbar { width: 4px; }
+.sidebar-content::-webkit-scrollbar-track { background: transparent; }
+.sidebar-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+/* ─── MAP LAYER TOGGLES ──────────────────────── */
+.layer-section {
+  margin-bottom: 20px;
+}
+
+.layer-section-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.layer-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.layer-toggle:hover { background: var(--bg-hover); }
+
+.layer-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.layer-toggle label {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-primary);
+  cursor: pointer;
+  flex: 1;
+}
+
+.layer-toggle input[type="checkbox"] {
+  appearance: none;
+  width: 34px;
+  height: 18px;
+  background: var(--bg-primary);
+  border-radius: 9px;
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.layer-toggle input[type="checkbox"]::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: var(--text-muted);
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: all 0.2s;
+}
+
+.layer-toggle input[type="checkbox"]:checked {
+  background: var(--accent-highlight);
+}
+
+.layer-toggle input[type="checkbox"]:checked::after {
+  background: var(--bg-primary);
+  left: 18px;
+}
+
+/* ─── STATS CARDS ────────────────────────────── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+
+.stat-value {
+  font-family: 'Playfair Display', serif;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.stat-label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+/* ─── WALK SESSIONS LIST ─────────────────────── */
+.session-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background 0.15s;
+  border: 1px solid transparent;
+}
+
+.session-item:hover {
+  background: var(--bg-hover);
+  border-color: var(--border);
+}
+
+.session-item.active {
+  background: var(--bg-card);
+  border-color: var(--accent-highlight);
+}
+
+.session-color {
+  width: 4px;
+  height: 36px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.session-info { flex: 1; min-width: 0; }
+
+.session-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.session-animate-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.session-animate-btn:hover {
+  border-color: var(--accent-highlight);
+  color: var(--accent-highlight);
+}
+
+.session-animate-btn.playing {
+  border-color: var(--accent-highlight);
+  color: var(--bg-primary);
+  background: var(--accent-highlight);
+}
+
+/* ─── PHOTOS PANEL ───────────────────────────── */
+.photo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.photo-thumb {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid var(--border-subtle);
+  transition: border-color 0.2s;
+}
+
+.photo-thumb:hover {
+  border-color: var(--accent-highlight);
+}
+
+.photo-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-thumb .photo-cat {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  background: rgba(15,18,21,0.85);
+  color: var(--text-secondary);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+/* ─── NOTES LIST ─────────────────────────────── */
+.note-item {
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.note-item:hover { border-color: var(--border); }
+
+.note-text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.note-meta {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+.note-cat-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  margin-right: 6px;
+}
+
+/* ─── PHOTO LIGHTBOX ─────────────────────────── */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.92);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s;
+}
+
+.lightbox.open {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.lightbox img {
+  max-width: 90vw;
+  max-height: 70vh;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.lightbox-info {
+  margin-top: 16px;
+  text-align: center;
+  max-width: 500px;
+}
+
+.lightbox-note {
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+.lightbox-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 28px;
+  cursor: pointer;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background 0.2s;
+}
+
+.lightbox-close:hover { background: rgba(255,255,255,0.1); }
+
+/* ─── MAP ────────────────────────────────────── */
+.map-container {
+  position: relative;
+  height: 100%;
+}
+
+#map {
+  width: 100%;
+  height: 100%;
+  background: var(--bg-primary);
+}
+
+.leaflet-tile-pane { filter: saturate(0.3) brightness(1) contrast(1.1); }
+
+.leaflet-control-zoom a {
+  background: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border) !important;
+}
+
+.leaflet-control-attribution { display: none !important; }
+
+.map-legend {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  background: rgba(30,35,40,0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  z-index: 1000;
+  min-width: 160px;
+}
+
+.map-legend-title {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.map-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.map-legend-color {
+  width: 18px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.map-legend-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* ─── LOADING STATE ──────────────────────────── */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  transition: opacity 0.5s;
+}
+
+.loading-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent-highlight);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 16px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* ─── ANIMATION PROGRESS BAR ─────────────────── */
+.anim-bar {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(30,35,40,0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 20px;
+  z-index: 1000;
+  display: none;
+  align-items: center;
+  gap: 14px;
+  min-width: 280px;
+}
+
+.anim-bar.visible { display: flex; }
+
+.anim-bar-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.anim-bar-track {
+  flex: 1;
+  height: 3px;
+  background: var(--bg-primary);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.anim-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--accent-highlight);
+  border-radius: 2px;
+  transition: width 0.1s linear;
+}
+
+.anim-bar-stop {
+  background: none;
+  border: 1px solid var(--text-muted);
+  color: var(--text-muted);
+  font-size: 10px;
+  padding: 3px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.anim-bar-stop:hover {
+  border-color: var(--accent-highlight);
+  color: var(--accent-highlight);
+}
+
+/* ─── SIGHTLINE MARKERS ──────────────────────── */
+.sightline-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ─── EMPTY STATE ────────────────────────────── */
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* ─── FILTER BAR ─────────────────────────────── */
+.filter-bar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.filter-pill {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.filter-pill:hover { border-color: var(--text-secondary); }
+.filter-pill.active {
+  background: var(--accent-highlight);
+  border-color: var(--accent-highlight);
+  color: var(--bg-primary);
+}
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loading">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">Loading field data…</div>
+</div>
+
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()">×</button>
+  <img id="lightbox-img" src="" alt="">
+  <div class="lightbox-info">
+    <div class="lightbox-note" id="lightbox-note"></div>
+    <div class="lightbox-meta" id="lightbox-meta"></div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">FieldScope</div>
+      <div class="logo-sub">Charleston Neighborhood Research</div>
+    </div>
+
+    <div class="sidebar-tabs">
+      <div class="sidebar-tab active" onclick="switchTab('layers')">Map</div>
+      <div class="sidebar-tab" onclick="switchTab('sessions')">Walks</div>
+      <div class="sidebar-tab" onclick="switchTab('photos')">Photos</div>
+      <div class="sidebar-tab" onclick="switchTab('notes')">Notes</div>
+    </div>
+
+    <div class="sidebar-content" id="sidebar-content"></div>
+  </div>
+
+  <div class="map-container">
+    <div id="map"></div>
+    <div class="anim-bar" id="anim-bar">
+      <span class="anim-bar-label" id="anim-label">Replaying…</span>
+      <div class="anim-bar-track"><div class="anim-bar-fill" id="anim-fill"></div></div>
+      <button class="anim-bar-stop" onclick="stopAnimation()">Stop</button>
+    </div>
+    <div class="map-legend">
+      <div class="map-legend-title">Neighborhoods</div>
+      <div class="map-legend-item"><div class="map-legend-color" style="background:var(--accent-ansonborough)"></div><span class="map-legend-label">Ansonborough</span></div>
+      <div class="map-legend-item"><div class="map-legend-color" style="background:var(--accent-french)"></div><span class="map-legend-label">French Quarter</span></div>
+      <div class="map-legend-item"><div class="map-legend-color" style="background:var(--accent-market)"></div><span class="map-legend-label">Market Street</span></div>
+      <div class="map-legend-item"><div class="map-legend-color" style="background:var(--accent-gadsdenboro)"></div><span class="map-legend-label">Gadsdenboro</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── CONFIG ──────────────────────────────────────
+const SUPABASE_URL = 'https://jhdllorjndrbnyqwvucn.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpoZGxsb3JqbmRyYm55cXd2dWNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxOTg4NTcsImV4cCI6MjA5NDc3NDg1N30.rYWV6kTh5dcDsiHW-_otxOeMgxgoawYFYrn_QfGivLk';
+
+const NEIGHBORHOOD_COLORS = {
+  ansonborough: '#D4613E',
+  french_quarter: '#C27BA0',
+  market_street: '#D4A03E',
+  gadsdenboro: '#3E9B8F'
+};
+
+const NEIGHBORHOOD_NAMES = {
+  ansonborough: 'Ansonborough',
+  french_quarter: 'French Quarter',
+  market_street: 'Market Street',
+  gadsdenboro: 'Gadsdenboro'
+};
+
+// Approximate neighborhood boundary polygons
+const NEIGHBORHOOD_BOUNDS = {
+  ansonborough: [
+    [32.782043969765901,-79.931711566836697],[32.782416908268701,-79.928035321223504],[32.782446125626102,-79.927756503169903],[32.782902508902602,-79.927912412507794],[32.7834332269599,-79.928188469681103],[32.783490995411903,-79.928221048372905],[32.784247724725297,-79.928647768542305],[32.784978035578398,-79.929050749534099],[32.785216140501198,-79.9290791173933],[32.7854531622786,-79.929068948713706],[32.786237654671901,-79.929035296269305],[32.786323455536802,-79.929049531175806],[32.786899208931501,-79.929131474231994],[32.786897431737003,-79.929143875407107],[32.786856552739501,-79.929429151445802],[32.786822819214898,-79.929664531751698],[32.786807881346199,-79.929768771998795],[32.785151055405102,-79.933225436062401],[32.785142090423399,-79.933220904647797],[32.783240941659002,-79.931887825682693],[32.7820415223133,-79.9317356452719],[32.782043969765901,-79.931711566836697]
+  ],
+  french_quarter: [
+    [32.780261279910398,-79.925744552422302],[32.780100076125002,-79.927110136509498],[32.780118344780099,-79.9271124175702],[32.780010436926503,-79.928044108232697],[32.779943974437401,-79.928311746652398],[32.779420141180097,-79.931411576614195],[32.776481456567303,-79.931017363800706],[32.776484945982901,-79.930979823366201],[32.776540051668697,-79.930415777345402],[32.776554217061197,-79.930273065200893],[32.776650289463603,-79.929230494513604],[32.776814311358002,-79.927465451396401],[32.776855053826502,-79.927037456228703],[32.7768200957833,-79.927033424676296],[32.776795167993797,-79.927030528465906],[32.7767638005433,-79.927025409819706],[32.776704783750702,-79.927013920540602],[32.776698796941801,-79.927012638365497],[32.776697900171698,-79.926925516018301],[32.776691288318197,-79.926813608784798],[32.776691310856698,-79.926803019746998],[32.776695670835302,-79.926763809405202],[32.776703887449699,-79.926674689774998],[32.776754781026199,-79.926104723731697],[32.776757843950399,-79.926068185278396],[32.776815907020101,-79.925444729468296],[32.776876325826798,-79.9254437392227],[32.777082495245899,-79.9254618935324],[32.777330001580602,-79.9254836833139],[32.777435622422303,-79.925492985012298],[32.7774680173452,-79.925513734126],[32.777500741437102,-79.925554711090101],[32.777966094073101,-79.925592592905701],[32.777966905888299,-79.925577311773196],[32.777970438873702,-79.925510729668005],[32.778162315843801,-79.925524758076094],[32.778159437951999,-79.925598056706306],[32.778159109631098,-79.925606470835604],[32.778399864081301,-79.9256239663884],[32.778584487597698,-79.925637380864003],[32.778836674456997,-79.925655678545397],[32.778948948967098,-79.925643611770795],[32.778966637151299,-79.925641714838406],[32.778981274627697,-79.925626080835698],[32.779010839593901,-79.925608632969798],[32.779031748597902,-79.925601335146496],[32.7790905905633,-79.925605736314196],[32.779270864609799,-79.925625525375807],[32.780261279910398,-79.925744552422302]
+  ],
+  market_street: [
+      [32.7819387,-79.925868],[32.7818628,-79.9267954],[32.7817539,-79.9281338],[32.781571,-79.9305425],[32.7814267,-79.9330549],[32.780734,-79.9353072],[32.7802976,-79.9364188],[32.7800914,-79.9364048],[32.7797571,-79.9363493],[32.780657,-79.9257226],[32.7819387,-79.925868]
+    ],
+    gadsdenboro: [
+        [32.7892416,-79.9287634],[32.7911215,-79.9247551],[32.7881804,-79.9233966],[32.7864832,-79.928289],[32.7892416,-79.9287634]
+      ]
+};
+
+// ─── STATE ───────────────────────────────────────
+let state = {
+  sessions: [],
+  trackPoints: {},
+  photos: [],
+  notes: [],
+  sightlines: [],
+  activeTab: 'layers',
+  layers: {
+    neighborhoods: true,
+    walks: true,
+    photos: true,
+    notes: true,
+    sightlines: false
+  },
+  photoFilter: 'all',
+  activeSession: null,
+  animationId: null
+};
+
+let map, walkLayers = {}, photoMarkers = [], noteMarkers = [], sightlineMarkers = [];
+let neighborhoodLayers = [];
+let animPolyline = null, animMarker = null;
+
+// ─── SUPABASE FETCH ──────────────────────────────
+async function supaFetch(table, query = '') {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`
+    }
+  });
+  return res.json();
+}
+
+async function loadAllData() {
+  const [sessions, photos, notes, sightlines] = await Promise.all([
+    supaFetch('walk_sessions', 'order=start_date.desc'),
+    supaFetch('photos', 'order=captured_at.desc'),
+    supaFetch('notes', 'order=recorded_at.desc'),
+    supaFetch('sightline_observations', 'order=recorded_at.desc')
+  ]);
+
+  state.sessions = sessions || [];
+  state.photos = photos || [];
+  state.notes = notes || [];
+  state.sightlines = sightlines || [];
+
+  // Load track points for each session
+  const sessionIds = state.sessions.map(s => s.id);
+  if (sessionIds.length > 0) {
+    const allTracks = await supaFetch('track_points', `session_id=in.(${sessionIds.join(',')})&order=sequence.asc`);
+    state.trackPoints = {};
+    (allTracks || []).forEach(tp => {
+      if (!state.trackPoints[tp.session_id]) state.trackPoints[tp.session_id] = [];
+      state.trackPoints[tp.session_id].push(tp);
+    });
+  }
+}
+
+// ─── MAP SETUP ───────────────────────────────────
+function initMap() {
+  map = L.map('map', {
+    center: [32.7825, -79.9290],
+    zoom: 16,
+    zoomControl: true,
+    attributionControl: false
+  });
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 20
+  }).addTo(map);
+
+  drawNeighborhoods();
+}
+
+    const TRANSITION_ZONES = [
+      {
+        colors: ['#D4613E', '#3E9B8F'],
+          coords: [[32.7853119,-79.9291323],[32.7866285,-79.9281653],[32.7892624,-79.9287828],[32.7876137,-79.9292683],[32.7853119,-79.9291323]]      },
+      {
+        colors: ['#D4613E', '#D4A03E'],
+        coords: [[32.7820754,-79.9318297],[32.7814758,-79.9324556],[32.7818429,-79.9269392],[32.7824915,-79.9277689],[32.7820754,-79.9318297]]
+      },
+      {
+        colors: ['#D4A03E', '#C27BA0'],
+        coords: [[32.7801752,-79.9316976],[32.7793789,-79.9314703],[32.7802708,-79.9257683],[32.7806848,-79.9257304],[32.7803982,-79.9292918],[32.7801752,-79.9316976]]
+      }
+    ];
+
+    function blendHexColors(c1, c2) {
+      const hex = c => parseInt(c, 16);
+      const r = Math.round((hex(c1.slice(1,3)) + hex(c2.slice(1,3))) / 2);
+      const g = Math.round((hex(c1.slice(3,5)) + hex(c2.slice(3,5))) / 2);
+      const b = Math.round((hex(c1.slice(5,7)) + hex(c2.slice(5,7))) / 2);
+      return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+    }
+    
+function drawNeighborhoods() {
+  neighborhoodLayers.forEach(l => map.removeLayer(l));
+  neighborhoodLayers = [];
+
+  if (!state.layers.neighborhoods) return;
+
+  Object.entries(NEIGHBORHOOD_BOUNDS).forEach(([id, coords]) => {
+    const color = NEIGHBORHOOD_COLORS[id] || '#888';
+    const poly = L.polygon(coords, {
+      color: color,
+      weight: 2,
+      opacity: 0.7,
+      fillColor: color,
+      fillOpacity: 0.1,
+      dashArray: '6,4'
+    }).addTo(map);
+
+    const center = poly.getBounds().getCenter();
+    const label = L.divIcon({
+      className: '',
+      html: `<div style="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;color:${color};text-transform:uppercase;letter-spacing:1.5px;white-space:nowrap;text-shadow:0 1px 4px rgba(0,0,0,0.8)">${NEIGHBORHOOD_NAMES[id]}</div>`,
+      iconSize: [120, 20],
+      iconAnchor: [60, 10]
+    });
+    const labelMarker = L.marker(center, { icon: label, interactive: false }).addTo(map);
+
+    neighborhoodLayers.push(poly, labelMarker);
+      });
+
+      // Draw transition gradient zones
+      TRANSITION_ZONES.forEach(zone => {
+        const blended = blendHexColors(zone.colors[0], zone.colors[1]);
+        const gradientPoly = L.polygon(zone.coords, {
+          color: 'transparent',
+          weight: 0,
+          fillColor: blended,
+          fillOpacity: 0.175,
+          interactive: false
+        }).addTo(map);
+        neighborhoodLayers.push(gradientPoly);
+      });
+    }
+
+function drawWalks() {
+  Object.values(walkLayers).forEach(l => map.removeLayer(l));
+  walkLayers = {};
+
+  if (!state.layers.walks) return;
+
+  state.sessions.forEach(session => {
+    const points = state.trackPoints[session.id];
+    if (!points || points.length < 2) return;
+
+    const latlngs = points.map(p => [p.latitude, p.longitude]);
+    const color = NEIGHBORHOOD_COLORS[session.start_neighborhood_id] || '#888';
+
+    const line = L.polyline(latlngs, {
+      color: color,
+      weight: 3,
+      opacity: state.activeSession === session.id ? 1 : 0.5,
+      lineCap: 'round',
+      lineJoin: 'round'
+    }).addTo(map);
+
+    walkLayers[session.id] = line;
+  });
+}
+
+function drawPhotos() {
+  photoMarkers.forEach(m => map.removeLayer(m));
+  photoMarkers = [];
+
+  if (!state.layers.photos) return;
+
+  const filtered = state.photoFilter === 'all'
+    ? state.photos
+    : state.photos.filter(p => (p.neighborhood_id || '').toLowerCase() === state.photoFilter);
+
+  filtered.forEach(photo => {
+    if (!photo.latitude || !photo.longitude) return;
+
+    const hasImage = photo.image_url;
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="width:14px;height:14px;border-radius:4px;border:1px solid ${NEIGHBORHOOD_COLORS[photo.neighborhood_id] || '#888'};background:var(--bg-card);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.4)">📷</div>`,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14]
+    });
+
+    const marker = L.marker([photo.latitude, photo.longitude], { icon })
+      .addTo(map)
+      .on('click', () => openLightbox(photo));
+
+    photoMarkers.push(marker);
+  });
+}
+
+function drawNotes() {
+  noteMarkers.forEach(m => map.removeLayer(m));
+  noteMarkers = [];
+
+  if (!state.layers.notes) return;
+
+  state.notes.forEach(note => {
+    if (!note.latitude || !note.longitude) return;
+
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="width:12px;height:12px;border-radius:50%;border:1px solid var(--accent-highlight);background:rgba(232,192,106,0.15);display:flex;align-items:center;justify-content:center;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,0.4)">📝</div>`,
+      iconSize: [24, 24],
+      iconAnchor: [12, 12]
+    });
+
+    const marker = L.marker([note.latitude, note.longitude], { icon })
+      .addTo(map)
+      .bindPopup(`
+        <div style="font-family:'DM Sans',sans-serif;font-size:13px;color:#222;max-width:220px">
+          <div style="font-weight:600;margin-bottom:4px">${note.category || 'Note'}</div>
+          <div>${note.text || ''}</div>
+        </div>
+      `);
+
+    noteMarkers.push(marker);
+  });
+}
+
+function drawSightlines() {
+  sightlineMarkers.forEach(m => map.removeLayer(m));
+  sightlineMarkers = [];
+
+  if (!state.layers.sightlines) return;
+
+  state.sightlines.forEach(sl => {
+    if (!sl.latitude || !sl.longitude || sl.heading == null) return;
+
+    const len = 0.0012;
+    const rad = (90 - sl.heading) * Math.PI / 180;
+    const endLat = sl.latitude + len * Math.sin(rad);
+    const endLng = sl.longitude + len * Math.cos(rad);
+
+    const color = NEIGHBORHOOD_COLORS[sl.neighborhood_id] || '#E8C06A';
+
+    const line = L.polyline(
+      [[sl.latitude, sl.longitude], [endLat, endLng]],
+      { color, weight: 2, opacity: 0.7, dashArray: '4,4' }
+    ).addTo(map);
+
+    const targets = sl.targets ? (Array.isArray(sl.targets) ? sl.targets.join(', ') : sl.targets) : 'Unknown';
+    line.bindPopup(`
+      <div style="font-family:'DM Sans',sans-serif;font-size:12px;color:#222">
+        <div style="font-weight:600">Sightline</div>
+        <div>Heading: ${Math.round(sl.heading)}°</div>
+        <div>Visible: ${targets}</div>
+      </div>
+    `);
+
+    const arrowIcon = L.divIcon({
+      className: 'sightline-icon',
+      html: `<div style="width:8px;height:8px;border-radius:50%;background:${color};box-shadow:0 0 6px ${color}"></div>`,
+      iconSize: [8, 8],
+      iconAnchor: [4, 4]
+    });
+
+    const arrowMarker = L.marker([sl.latitude, sl.longitude], { icon: arrowIcon, interactive: false }).addTo(map);
+
+    sightlineMarkers.push(line, arrowMarker);
+  });
+}
+
+function refreshMap() {
+  drawNeighborhoods();
+  drawWalks();
+  drawPhotos();
+  drawNotes();
+  drawSightlines();
+}
+
+// ─── ANIMATION ───────────────────────────────────
+function animateSession(sessionId) {
+  stopAnimation();
+
+  const points = state.trackPoints[sessionId];
+  if (!points || points.length < 2) return;
+
+  const session = state.sessions.find(s => s.id === sessionId);
+  const color = NEIGHBORHOOD_COLORS[session?.start_neighborhood_id] || '#888';
+  const latlngs = points.map(p => [p.latitude, p.longitude]);
+
+  // Zoom to fit
+  map.fitBounds(L.latLngBounds(latlngs).pad(0.2));
+
+  // Remove existing walk line for this session
+  if (walkLayers[sessionId]) {
+    map.removeLayer(walkLayers[sessionId]);
+  }
+
+  animPolyline = L.polyline([], {
+    color: color,
+    weight: 4,
+    opacity: 1,
+    lineCap: 'round'
+  }).addTo(map);
+
+  animMarker = L.circleMarker(latlngs[0], {
+    radius: 6,
+    color: '#fff',
+    fillColor: color,
+    fillOpacity: 1,
+    weight: 2
+  }).addTo(map);
+
+  const bar = document.getElementById('anim-bar');
+  const fill = document.getElementById('anim-fill');
+  const label = document.getElementById('anim-label');
+  bar.classList.add('visible');
+  label.textContent = `Replaying ${NEIGHBORHOOD_NAMES[session?.start_neighborhood_id] || 'walk'}…`;
+
+  let idx = 0;
+  const speed = Math.max(10, Math.floor(3000 / latlngs.length));
+
+  state.animationId = setInterval(() => {
+    if (idx >= latlngs.length) {
+      stopAnimation();
+      // Redraw normal walk line
+      drawWalks();
+      return;
+    }
+
+    animPolyline.addLatLng(latlngs[idx]);
+    animMarker.setLatLng(latlngs[idx]);
+    fill.style.width = `${(idx / (latlngs.length - 1)) * 100}%`;
+    idx++;
+  }, speed);
+}
+
+function stopAnimation() {
+  if (state.animationId) {
+    clearInterval(state.animationId);
+    state.animationId = null;
+  }
+  if (animPolyline) { map.removeLayer(animPolyline); animPolyline = null; }
+  if (animMarker) { map.removeLayer(animMarker); animMarker = null; }
+  document.getElementById('anim-bar').classList.remove('visible');
+  document.getElementById('anim-fill').style.width = '0%';
+}
+
+// ─── LIGHTBOX ────────────────────────────────────
+function openLightbox(photo) {
+  const lb = document.getElementById('lightbox');
+  const img = document.getElementById('lightbox-img');
+  const note = document.getElementById('lightbox-note');
+  const meta = document.getElementById('lightbox-meta');
+
+  img.src = photo.image_url || '';
+  note.textContent = photo.note && photo.note !== 'EMPTY' ? photo.note : '';
+  const date = photo.captured_at ? new Date(photo.captured_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+  const hood = NEIGHBORHOOD_NAMES[photo.neighborhood_id] || '';
+  meta.textContent = [photo.category, hood, date].filter(Boolean).join(' · ');
+
+  lb.classList.add('open');
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+}
+
+// ─── SIDEBAR RENDERING ───────────────────────────
+function switchTab(tab) {
+  state.activeTab = tab;
+  document.querySelectorAll('.sidebar-tab').forEach((el, i) => {
+    el.classList.toggle('active', ['layers','sessions','photos','notes'][i] === tab);
+  });
+  renderSidebar();
+}
+
+function renderSidebar() {
+  const el = document.getElementById('sidebar-content');
+  switch (state.activeTab) {
+    case 'layers': el.innerHTML = renderLayersTab(); break;
+    case 'sessions': el.innerHTML = renderSessionsTab(); break;
+    case 'photos': el.innerHTML = renderPhotosTab(); break;
+    case 'notes': el.innerHTML = renderNotesTab(); break;
+  }
+  bindSidebarEvents();
+}
+
+function renderLayersTab() {
+  const totalDistance = state.sessions.reduce((sum, s) => sum + (s.distance_meters || 0), 0);
+  const totalPhotos = state.photos.length;
+  const totalNotes = state.notes.length;
+  const totalSightlines = state.sightlines.length;
+
+  return `
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">${state.sessions.length}</div>
+        <div class="stat-label">Walk Sessions</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${(totalDistance / 1609.34).toFixed(1)} mi</div>
+        <div class="stat-label">Distance</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${totalPhotos}</div>
+        <div class="stat-label">Photos</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${totalNotes + totalSightlines}</div>
+        <div class="stat-label">Observations</div>
+      </div>
+    </div>
+
+    <div class="layer-section">
+      <div class="layer-section-title">Map Layers</div>
+      ${renderToggle('neighborhoods', 'Neighborhood Boundaries', '#888')}
+      ${renderToggle('walks', 'Walk Tracks', '#E8C06A')}
+      ${renderToggle('photos', 'Photo Markers', '#8BC34A')}
+      ${renderToggle('notes', 'Notes', '#FFB74D')}
+      ${renderToggle('sightlines', 'Sightline Vectors', '#80DEEA')}
+    </div>
+  `;
+}
+
+function renderToggle(key, label, color) {
+  return `
+    <div class="layer-toggle" onclick="toggleLayer('${key}')">
+      <div class="layer-dot" style="background:${color}"></div>
+      <label>${label}</label>
+      <input type="checkbox" ${state.layers[key] ? 'checked' : ''} />
+    </div>
+  `;
+}
+
+function renderSessionsTab() {
+  if (state.sessions.length === 0) {
+    return '<div class="empty-state">No walk sessions recorded yet.</div>';
+  }
+
+  return state.sessions.map(s => {
+    const date = new Date(s.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const time = new Date(s.start_date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    const dist = s.distance_meters ? `${(s.distance_meters / 1609.34).toFixed(2)} mi` : '—';
+    const hood = NEIGHBORHOOD_NAMES[s.start_neighborhood_id] || 'Outside';
+    const color = NEIGHBORHOOD_COLORS[s.start_neighborhood_id] || '#555';
+    const trackCount = (state.trackPoints[s.id] || []).length;
+    const isActive = state.activeSession === s.id;
+
+    return `
+      <div class="session-item ${isActive ? 'active' : ''}" onclick="selectSession('${s.id}')">
+        <div class="session-color" style="background:${color}"></div>
+        <div class="session-info">
+          <div class="session-name">${hood} — ${date}</div>
+          <div class="session-meta">${time} · ${dist} · ${trackCount} pts</div>
+        </div>
+        ${trackCount > 1 ? `<button class="session-animate-btn ${state.animationId && isActive ? 'playing' : ''}" onclick="event.stopPropagation();animateSession('${s.id}')">▶ Replay</button>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function renderPhotosTab() {
+  const hoods = [...new Set(state.photos.map(p => p.neighborhood_id).filter(Boolean))];
+
+  let filterHtml = `
+    <div class="filter-bar">
+      <button class="filter-pill ${state.photoFilter === 'all' ? 'active' : ''}" onclick="setPhotoFilter('all')">All</button>
+      ${hoods.map(h => `<button class="filter-pill ${state.photoFilter === h ? 'active' : ''}" onclick="setPhotoFilter('${h}')">${NEIGHBORHOOD_NAMES[h] || h}</button>`).join('')}
+    </div>
+  `;
+
+  const filtered = state.photoFilter === 'all'
+    ? state.photos
+    : state.photos.filter(p => p.neighborhood_id === state.photoFilter);
+
+  if (filtered.length === 0) {
+    return filterHtml + '<div class="empty-state">No photos yet.</div>';
+  }
+
+  const grid = filtered.map(p => `
+    <div class="photo-thumb" onclick='openLightbox(${JSON.stringify(p).replace(/'/g, "&#39;")})'>
+      <img src="${p.image_url || ''}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'" />
+      ${p.category ? `<span class="photo-cat">${p.category}</span>` : ''}
+    </div>
+  `).join('');
+
+  return filterHtml + `<div class="photo-grid">${grid}</div>`;
+}
+
+function renderNotesTab() {
+  if (state.notes.length === 0) {
+    return '<div class="empty-state">No notes recorded yet.</div>';
+  }
+
+  return state.notes.map(n => {
+    const date = n.recorded_at ? new Date(n.recorded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+    const hood = NEIGHBORHOOD_NAMES[n.neighborhood_id] || '';
+
+    return `
+      <div class="note-item" onclick="flyToNote(${n.latitude},${n.longitude})">
+        ${n.category ? `<span class="note-cat-badge">${n.category}</span>` : ''}
+        <div class="note-text">${n.text || '(empty)'}</div>
+        <div class="note-meta">${[hood, date].filter(Boolean).join(' · ')}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ─── INTERACTIONS ────────────────────────────────
+function toggleLayer(key) {
+  state.layers[key] = !state.layers[key];
+  refreshMap();
+  renderSidebar();
+}
+
+function selectSession(id) {
+  state.activeSession = state.activeSession === id ? null : id;
+  drawWalks();
+  renderSidebar();
+
+  if (state.activeSession) {
+    const points = state.trackPoints[id];
+    if (points && points.length > 0) {
+      const bounds = L.latLngBounds(points.map(p => [p.latitude, p.longitude]));
+      map.fitBounds(bounds.pad(0.2));
+    }
+  }
+}
+
+function setPhotoFilter(filter) {
+  state.photoFilter = filter;
+  drawPhotos();
+  renderSidebar();
+}
+
+function flyToNote(lat, lng) {
+  if (lat && lng) map.flyTo([lat, lng], 18, { duration: 0.5 });
+}
+
+function bindSidebarEvents() {
+  // Events are handled via onclick attributes
+}
+
+// ─── INIT ────────────────────────────────────────
+async function init() {
+  initMap();
+  await loadAllData();
+  refreshMap();
+  renderSidebar();
+  document.getElementById('loading').classList.add('hidden');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeLightbox();
+    stopAnimation();
+  }
+});
+
+init();
+</script>
+</body>
+</html>
