@@ -80,39 +80,9 @@
   --panel-w: clamp(360px, 33vw, 520px);   /* ~1/3 of the screen (matches Cooper) */
 }
 
-/* ── UNION DARK — full UI swap (only when NOT the Cooper style) ── */
+/* ── UNION DARK — MAP ONLY: the white panel stays, only the basemap tiles darken ── */
 :root.dark:not(.style-cooper) {
-  --bg-primary: #0a2240;
-  --bg-secondary: #0d2d4a;
-  --bg-card: #11354f;
-  --bg-hover: #153d58;
-  --bg-dark: #05121f;
-
-  --text-primary: #e8eef1;
-  --text-secondary: #8aa4b0;
-  --text-muted: #4d7080;
-  --text-link: #77a2d0;
-
-  --blue-light: rgba(13,107,159,0.20);
-  --blue-faint: rgba(13,107,159,0.10);
-
-  --border: rgba(13,107,159,0.20);
-  --border-primary: rgba(13,107,159,0.20);
-  --border-subtle: rgba(13,107,159,0.10);
-  --border-pill: rgba(13,107,159,0.25);
-  --double-line: rgba(13,107,159,0.15);
-  --track: #0a2240;
-  --scroll-thumb: rgba(13,107,159,0.25);
-  --scroll-thumb-hover: rgba(13,107,159,0.40);
-
-  --map-panel-bg: rgba(13,45,74,0.90);
-  --map-panel-border: rgba(13,107,159,0.20);
-  --map-panel-blur: blur(14px);
   --tile-filter: saturate(0.4) brightness(0.85) contrast(1.05);
-  --chart-grid: rgba(232,238,241,0.10);
-
-  --panel-shadow: 0 8px 28px rgba(0,0,0,0.35);
-  --shadow: 0 8px 28px rgba(0,0,0,0.40);
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -1364,19 +1334,19 @@ function setBasemap() {
   tileLayer.bringToBack();
 }
 function restoreTheme() {
-  let dark = false, cooper = true; // default style = Cooper (warm indexcopy4)
-  try { dark = localStorage.getItem('up_theme') === 'dark'; } catch (e) {}
+  // Default = Union (white sidebar) + dark map. Either saved preference still wins.
+  let dark = true, cooper = false;
+  try { const t = localStorage.getItem('up_theme'); if (t) dark = (t === 'dark'); } catch (e) {}
   try { const s = localStorage.getItem('up_style'); if (s) cooper = (s === 'cooper'); } catch (e) {}
   document.documentElement.classList.toggle('dark', dark);
   document.documentElement.classList.toggle('style-cooper', cooper);
 }
-// DARK toggle: Union style → full UI swap; Cooper style → map-only (CSS handles which).
-// Either way it swaps the basemap tiles + re-inks the on-map overlays + rebuilds charts.
+// DARK toggle is MAP-ONLY in both styles: the light panel stays, only the basemap
+// tiles darken + the on-map overlays re-ink. The panel palette never changes.
 function applyTheme(dark) {
   document.documentElement.classList.toggle('dark', !!dark);
   try { localStorage.setItem('up_theme', dark ? 'dark' : 'light'); } catch (e) {}
   if (map) { setBasemap(); drawUnionPierSite(); refreshMap(); }
-  renderSidebar();
 }
 function toggleDarkMode() { applyTheme(!isDark()); }
 // STYLE toggle: switch the whole look between Cooper (warm) and Union (blue).
