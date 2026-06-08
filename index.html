@@ -402,6 +402,32 @@ body {
 .layer-toggle input[type="checkbox"]:checked { background: var(--accent-primary); }
 .layer-toggle input[type="checkbox"]:checked::after { background: #ffffff; left: 18px; }
 
+/* sightline-type filter dropdown (on the Sightline Vectors toggle) */
+.layer-caret {
+  background: none; border: none; color: var(--text-muted); cursor: pointer;
+  font-size: 11px; line-height: 1; padding: 4px 6px; flex-shrink: 0; transition: transform 0.15s, color 0.15s;
+}
+.layer-caret:hover { color: var(--text-secondary); }
+.layer-caret.open { transform: rotate(180deg); }
+.sightline-types { margin: 2px 0 6px 28px; display: flex; flex-direction: column; gap: 1px; }
+.sightline-type-row {
+  display: flex; align-items: center; gap: 10px; padding: 5px 10px;
+  border-radius: var(--radius-sm); cursor: pointer; transition: background 0.15s;
+}
+.sightline-type-row:hover { background: var(--bg-hover); }
+.st-swatch { width: 16px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+.sightline-type-row label { font-size: 12px; color: var(--text-secondary); cursor: pointer; flex: 1; }
+.sightline-type-row input[type="checkbox"] {
+  appearance: none; width: 28px; height: 15px; background: var(--track);
+  border-radius: 8px; position: relative; cursor: pointer; flex-shrink: 0; transition: background 0.2s;
+}
+.sightline-type-row input[type="checkbox"]::after {
+  content: ''; position: absolute; width: 11px; height: 11px; background: #ffffff;
+  box-shadow: 0 0 0 0.5px rgba(47,58,89,0.18); border-radius: 50%; top: 2px; left: 2px; transition: all 0.2s;
+}
+.sightline-type-row input[type="checkbox"]:checked { background: var(--accent-primary); }
+.sightline-type-row input[type="checkbox"]:checked::after { left: 15px; }
+
 /* ─── STATS CARDS ────────────────────────────── */
 .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 22px; }
 .stat-card {
@@ -779,15 +805,16 @@ body {
 /* ─── INTERSECTION MARKERS ───────────────────── */
 /* container is click-through; only the diamond + numbered dots are interactive */
 .xsec-marker { position: relative; width: 80px; height: 80px; pointer-events: none; }
+/* intersection mark: a small blue square */
 .xsec-diamond {
-  width: 14px; height: 14px; transform: rotate(45deg); cursor: pointer;
+  width: 14px; height: 14px; border-radius: 2px; cursor: pointer;
   box-shadow: 0 1px 3px rgba(0,0,0,0.4); transition: transform 0.15s, box-shadow 0.15s;
 }
-.xsec-diamond:hover { box-shadow: 0 0 0 4px rgba(27,116,136,0.25), 0 1px 3px rgba(0,0,0,0.4); }
-/* small numbered dot placed at each building's compass heading */
+.xsec-diamond:hover { box-shadow: 0 0 0 4px rgba(13,107,159,0.25), 0 1px 3px rgba(0,0,0,0.4); }
+/* small numbered dot placed at each building's compass heading (tight to the mark) */
 .xsec-dot {
-  position: absolute; width: 16px; height: 16px; border-radius: 50%;
-  border: 1.5px solid rgba(255,255,255,0.6); color: #fff; font-size: 9px; font-weight: 600; line-height: 1;
+  position: absolute; width: 12px; height: 12px; border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.7); color: #fff; font-size: 8px; font-weight: 600; line-height: 1;
   display: flex; align-items: center; justify-content: center; cursor: pointer; pointer-events: auto;
   box-shadow: 0 1px 2px rgba(0,0,0,0.4); transition: transform 0.12s;
 }
@@ -1300,6 +1327,8 @@ let state = {
   screenshots: [],
   activeTab: 'layers',
   layers: { neighborhoods: true, coverage: true, walks: true, photos: true, notes: true, sightlines: false, intersections: true },
+  sightlineTypes: { water: true, landmark: true, green_space: true, long_corridor: true },
+  sightlineMenuOpen: false,
   photoFilter: 'all',
   photoCatFilter: 'all',
   noteCatFilter: 'all',
@@ -1630,15 +1659,17 @@ function drawSightlines() {
 
   state.sightlines.forEach(sl => {
     if (!sl.latitude || !sl.longitude || sl.heading == null) return;
+    const slType = sightlineType(sl);
+    // type filter (dropdown on the Sightline Vectors toggle); null/unknown types always show
+    if (slType && state.sightlineTypes && state.sightlineTypes[slType] === false) return;
     const len = 0.0012 * 1.3; // +30% length
     const rad = (90 - sl.heading) * Math.PI / 180;
     const endLat = sl.latitude + len * Math.sin(rad);
     const endLng = sl.longitude + len * Math.cos(rad);
-    const realColor = isCooper() ? '#77a2d0' : '#0d6b9f'; // coastal blue (Cooper) / brand blue (Union)
+    const realColor = SIGHTLINE_TYPE_COLORS[slType] || '#8a9aa5'; // color by type (water / landmark / green space / corridor)
 
-    const line = L.polyline([[sl.latitude, sl.longitude], [endLat, endLng]], { color: realColor, weight: 2, opacity: isCooper() ? 0.85 : 0.5, dashArray: isCooper() ? '6,4' : '4,4' }).addTo(map);
+    const line = L.polyline([[sl.latitude, sl.longitude], [endLat, endLng]], { color: realColor, weight: 2.5, opacity: 0.9, dashArray: '6,4' }).addTo(map);
     const targets = sl.targets ? (Array.isArray(sl.targets) ? sl.targets.join(', ') : sl.targets) : 'Unknown';
-    const slType = sightlineType(sl);
     const linked = sightlineSurveyId(sl) != null;
     line.bindPopup(`<div class="up-popup"><div class="up-popup-cat">Sightline${slType ? ' · ' + SIGHTLINE_TYPE_LABELS[slType] : ''}</div><div class="up-popup-body">Heading: ${Math.round(sl.heading)}°<br>Visible: ${targets}</div>${linked ? '<div class="up-popup-note">From intersection survey</div>' : ''}</div>`, { className: 'xsec-pop', maxWidth: 250 });
 
@@ -1717,7 +1748,7 @@ function drawIntersections() {
   intersectionMarkerById = {};
   if (!state.layers.intersections) return;
 
-  const C = 40, R = 28; // container center (80×80) and dot radius from center
+  const C = 40, R = 18; // container center (80×80); small dot radius — tight to the mark
   state.intersections.forEach(s => {
     if (!surveyHasLocation(s)) return; // skip "no GPS fix" (0,0) surveys — listed in Survey tab instead
     const hood = surveyHood(s);
@@ -1732,10 +1763,10 @@ function drawIntersections() {
       if (dir == null) return ''; // no heading → no map dot (still listed/numbered in popup)
       const rad = dir * Math.PI / 180;
       const x = C + R * Math.sin(rad), y = C - R * Math.cos(rad); // 0°=N=up, 90°=E=right
-      return `<div class="xsec-dot" style="left:${(x - 8).toFixed(1)}px;top:${(y - 8).toFixed(1)}px;background:${color}" title="Building ${i + 1}" onclick="event.stopPropagation();openIntersectionBuilding('${jsStr(sid)}',${i})">${i + 1}</div>`;
+      return `<div class="xsec-dot" style="left:${(x - 6).toFixed(1)}px;top:${(y - 6).toFixed(1)}px;background:${color}" title="Building ${i + 1}" onclick="event.stopPropagation();openIntersectionBuilding('${jsStr(sid)}',${i})">${i + 1}</div>`;
     }).join('');
 
-    const diamond = `<div class="xsec-diamond" style="background:${color};border:1.5px solid rgba(255,255,255,0.6);position:absolute;left:${C - 7}px;top:${C - 7}px;pointer-events:auto" onclick="event.stopPropagation();openIntersectionBuilding('${jsStr(sid)}',-1)"></div>`;
+    const diamond = `<div class="xsec-diamond" style="background:#0d6b9f;border:1.5px solid rgba(255,255,255,0.75);position:absolute;left:${C - 7}px;top:${C - 7}px;pointer-events:auto" onclick="event.stopPropagation();openIntersectionBuilding('${jsStr(sid)}',-1)"></div>`;
 
     const icon = L.divIcon({
       className: '',
@@ -2126,7 +2157,7 @@ function renderLayersTab() {
       ${renderToggle('walks', 'Walk Tracks', 'var(--accent-gadsdenboro)')}
       ${renderToggle('photos', 'Photo Markers', '#c49a2e')}
       ${renderToggle('notes', 'Notes', '#c49a2e')}
-      ${renderToggle('sightlines', 'Sightline Vectors', 'var(--accent-secondary)')}
+      ${renderSightlineToggle()}
       ${renderToggle('intersections', 'Intersection Surveys', 'var(--accent-french)')}
     </div>`;
 }
@@ -2136,6 +2167,25 @@ function renderToggle(key, label, color) {
     <label>${label}</label>
     <input type="checkbox" ${state.layers[key] ? 'checked' : ''} />
   </div>`;
+}
+// Sightline Vectors toggle with a dropdown to filter which TYPES are shown.
+function renderSightlineToggle() {
+  const open = state.sightlineMenuOpen;
+  let h = `<div class="layer-toggle" onclick="toggleLayer('sightlines')">
+    <div class="layer-dot" style="background:var(--accent-secondary)"></div>
+    <label>Sightline Vectors</label>
+    <button class="layer-caret ${open ? 'open' : ''}" title="Filter by type" onclick="event.stopPropagation();toggleSightlineMenu()">▾</button>
+    <input type="checkbox" ${state.layers.sightlines ? 'checked' : ''} />
+  </div>`;
+  if (open) {
+    h += `<div class="sightline-types">` + SIGHTLINE_TYPES.map(t =>
+      `<div class="sightline-type-row" onclick="toggleSightlineType('${t}')">
+        <span class="st-swatch" style="background:${SIGHTLINE_TYPE_COLORS[t]}"></span>
+        <label>${SIGHTLINE_TYPE_LABELS[t]}</label>
+        <input type="checkbox" ${state.sightlineTypes[t] ? 'checked' : ''} />
+      </div>`).join('') + `</div>`;
+  }
+  return h;
 }
 
 function renderSessionsTab() {
@@ -2634,6 +2684,8 @@ function buildIntersectionCharts() {
 
 // ─── INTERACTIONS ────────────────────────────────
 function toggleLayer(key) { state.layers[key] = !state.layers[key]; refreshMap(); renderSidebar(); }
+function toggleSightlineMenu() { state.sightlineMenuOpen = !state.sightlineMenuOpen; renderSidebar(); }
+function toggleSightlineType(t) { state.sightlineTypes[t] = !state.sightlineTypes[t]; if (map) drawSightlines(); renderSidebar(); }
 function selectSession(id) {
   state.activeSession = state.activeSession === id ? null : id;
   drawWalks();
