@@ -656,6 +656,34 @@ body {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ─── SITE PASSWORD GATE ─────────────────────── */
+/* Full-screen access gate shown before any content loads. Highest z-index so
+   nothing renders behind it; the map is not created until this is cleared. */
+.gate-overlay {
+  position: fixed; inset: 0; z-index: 30000;
+  background: var(--bg-primary);
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity 0.4s ease;
+}
+.gate-overlay.hidden { opacity: 0; pointer-events: none; }
+.gate-box { width: 320px; max-width: calc(100% - 48px); text-align: center; }
+.gate-logo { font-family: var(--font-serif); font-size: 34px; font-weight: 400; letter-spacing: 0.3px; color: var(--text-primary); line-height: 1.1; }
+.gate-rule { width: 44px; height: 1px; background: var(--blue-primary); margin: 16px auto 0; }
+.gate-sub { font-size: 10px; font-weight: 500; letter-spacing: 2.5px; text-transform: uppercase; color: var(--text-muted); margin-top: 16px; }
+.gate-form { margin-top: 30px; }
+.gate-form input {
+  width: 100%; background: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-primary);
+  border-radius: var(--radius); padding: 12px 14px; font-size: 14px; font-family: inherit; text-align: center; letter-spacing: 1px;
+}
+.gate-form input:focus { outline: none; border-color: var(--blue-primary); }
+.gate-submit {
+  width: 100%; margin-top: 12px; background: var(--blue-primary); color: var(--on-accent); border: none;
+  border-radius: var(--radius-md); padding: 12px; font-size: 11px; font-weight: 600; letter-spacing: 1.5px;
+  text-transform: uppercase; cursor: pointer; transition: background 0.2s ease;
+}
+.gate-submit:hover { background: var(--blue-secondary); }
+.gate-error { color: #e07a5f; font-size: 12px; min-height: 16px; margin-top: 12px; letter-spacing: 0.3px; }
+
 /* ─── ANIMATION BAR ──────────────────────────── */
 .anim-bar {
   position: absolute; top: 16px; left: calc(50% + (var(--panel-w) + 16px) / 2); transform: translateX(-50%);
@@ -675,6 +703,15 @@ body {
 .anim-bar-stop:hover { border-color: var(--accent-highlight); color: var(--accent-highlight); }
 
 .sightline-icon { display: flex; align-items: center; justify-content: center; }
+/* hover label for a sightline vector — type + what was visible */
+.leaflet-tooltip.sightline-tooltip {
+  background: var(--bg-secondary); color: var(--text-primary);
+  border: 1px solid var(--border); box-shadow: var(--shadow-sm);
+  font-family: var(--font-ui); font-size: 11px; font-weight: 500; letter-spacing: 0.2px;
+  padding: 4px 9px; border-radius: var(--radius);
+}
+.leaflet-tooltip.sightline-tooltip.leaflet-tooltip-top::before { border-top-color: var(--bg-secondary); }
+.leaflet-tooltip.sightline-tooltip.leaflet-tooltip-bottom::before { border-bottom-color: var(--bg-secondary); }
 
 /* pulse highlight for photo pins */
 @keyframes pulse-ring {
@@ -988,6 +1025,20 @@ body {
 </head>
 <body>
 
+<!-- Site password gate — shown before any content; the map does not load until cleared -->
+<div class="gate-overlay" id="gate">
+  <div class="gate-box">
+    <div class="gate-logo">Union Pier</div>
+    <div class="gate-rule"></div>
+    <div class="gate-sub">Field Research Viewer</div>
+    <form class="gate-form" onsubmit="return submitGate(event)">
+      <input type="password" id="gate-input" placeholder="Password" autocomplete="off" autofocus>
+      <button type="submit" class="gate-submit">Enter</button>
+      <div class="gate-error" id="gate-error"></div>
+    </form>
+  </div>
+</div>
+
 <div class="loading-overlay" id="loading">
   <div class="loading-logo">Union Pier</div>
   <div class="loading-rule"></div>
@@ -1209,12 +1260,12 @@ const SETBACKS = ['flush', 'shallow', 'deep'];
 const CONDITIONS = ['good', 'fair', 'poor'];
 const CANOPIES = ['none', 'partial', 'full'];
 const SIDEWALKS = ['narrow', 'standard', 'wide'];
-const SIGHTLINE_TYPES = ['water', 'landmark', 'green_space', 'long_corridor'];
-const SIGHTLINE_TYPE_LABELS = { water: 'Water', landmark: 'Landmark', green_space: 'Green Space', long_corridor: 'Long Corridor' };
+const SIGHTLINE_TYPES = ['water', 'landmark', 'green_space', 'long_corridor', 'custom'];
+const SIGHTLINE_TYPE_LABELS = { water: 'Water', landmark: 'Landmark', green_space: 'Green Space', long_corridor: 'Long Corridor', custom: 'Custom' };
 
 // Teal-family categorical palette for single-neighborhood / category charts
 const MATERIAL_COLORS = { brick: '#C0633E', stucco: '#D4A03E', wood: '#8a6d52', mixed: '#1b7488' };
-const SIGHTLINE_TYPE_COLORS = { water: '#2E8B82', landmark: '#C27BA0', green_space: '#3FB76B', long_corridor: '#D4A03E' };
+const SIGHTLINE_TYPE_COLORS = { water: '#4A90D9', landmark: '#D4A03E', green_space: '#4CAF50', long_corridor: '#9C7BBD', custom: '#8e93a4' };
 // chart chrome colors are re-read from the active theme's CSS vars (light/dark) before each build
 let TEAL = '#0d6b9f';
 let CHART_GRID = 'rgba(47,58,89,0.08)';
@@ -1289,7 +1340,7 @@ function sightlineType(sl) {
   if (/bridge|ravenel|steeple|church|landmark/.test(t)) return 'landmark';
   if (/park|open space|green/.test(t)) return 'green_space';
   if (/corridor|long street|long /.test(t)) return 'long_corridor';
-  return null;
+  return 'custom'; // anything otherwise unclassified is a "Custom" sightline (neutral color, still filterable)
 }
 function sightlineIsWater(sl) {
   if (sightlineType(sl) === 'water') return true;
@@ -1327,7 +1378,7 @@ let state = {
   screenshots: [],
   activeTab: 'layers',
   layers: { neighborhoods: true, coverage: true, walks: true, photos: true, notes: true, sightlines: false, intersections: true },
-  sightlineTypes: { water: true, landmark: true, green_space: true, long_corridor: true },
+  sightlineTypes: { water: true, landmark: true, green_space: true, long_corridor: true, custom: true },
   sightlineMenuOpen: false,
   photoFilter: 'all',
   photoCatFilter: 'all',
@@ -1363,8 +1414,8 @@ function setBasemap() {
   tileLayer.bringToBack();
 }
 function restoreTheme() {
-  // Default = Union (white sidebar) + dark map. Either saved preference still wins.
-  let dark = true, cooper = false;
+  // Default = Union (white sidebar) + light map (CartoDB Positron). Either saved preference still wins.
+  let dark = false, cooper = false;
   try { const t = localStorage.getItem('up_theme'); if (t) dark = (t === 'dark'); } catch (e) {}
   try { const s = localStorage.getItem('up_style'); if (s) cooper = (s === 'cooper'); } catch (e) {}
   document.documentElement.classList.toggle('dark', dark);
@@ -1443,7 +1494,7 @@ async function loadAllData() {
 // ─── MAP SETUP ───────────────────────────────────
 function initMap() {
   // floating panel covers the top-left, so put zoom controls on the right
-  map = L.map('map', { center: [32.7825, -79.9290], zoom: 16, zoomControl: false, attributionControl: false });
+  map = L.map('map', { center: [32.7825, -79.9290], zoom: 16, zoomControl: false, attributionControl: false, zoomSnap: 0.25, zoomDelta: 0.5 });
   L.control.zoom({ position: 'topright' }).addTo(map);
   setBasemap(); // light_all by default, dark_all when .dark
   drawUnionPierSite();
@@ -1660,7 +1711,8 @@ function drawSightlines() {
   state.sightlines.forEach(sl => {
     if (!sl.latitude || !sl.longitude || sl.heading == null) return;
     const slType = sightlineType(sl);
-    // type filter (dropdown on the Sightline Vectors toggle); null/unknown types always show
+    // type filter (dropdown on the Sightline Vectors toggle); every sightline now has a
+    // type (unclassified → 'custom'), so unchecking any type hides those vectors
     if (slType && state.sightlineTypes && state.sightlineTypes[slType] === false) return;
     const len = 0.0012 * 1.3; // +30% length
     const rad = (90 - sl.heading) * Math.PI / 180;
@@ -1672,6 +1724,8 @@ function drawSightlines() {
     const targets = sl.targets ? (Array.isArray(sl.targets) ? sl.targets.join(', ') : sl.targets) : 'Unknown';
     const linked = sightlineSurveyId(sl) != null;
     line.bindPopup(`<div class="up-popup"><div class="up-popup-cat">Sightline${slType ? ' · ' + SIGHTLINE_TYPE_LABELS[slType] : ''}</div><div class="up-popup-body">Heading: ${Math.round(sl.heading)}°<br>Visible: ${targets}</div>${linked ? '<div class="up-popup-note">From intersection survey</div>' : ''}</div>`, { className: 'xsec-pop', maxWidth: 250 });
+    // hover label: sightline type + what was visible (click still opens the fuller popup above)
+    line.bindTooltip(`${SIGHTLINE_TYPE_LABELS[slType] || 'Sightline'} · ${targets}`, { sticky: true, direction: 'top', opacity: 1, className: 'sightline-tooltip' });
 
     // arrowhead SVG rotated to heading (CSS rotate: 0deg points up/north)
     const arrowIcon = L.divIcon({
@@ -1833,7 +1887,7 @@ function animateSession(sessionId) {
   const color = NEIGHBORHOOD_COLORS[session?.start_neighborhood_id] || '#888';
   const latlngs = points.map(p => [p.latitude, p.longitude]);
 
-  map.fitBounds(L.latLngBounds(latlngs).pad(0.2));
+  map.fitBounds(L.latLngBounds(latlngs).pad(0.1));
   if (walkLayers[sessionId]) map.removeLayer(walkLayers[sessionId]);
 
   animPolyline = L.polyline([], { color, weight: 4, opacity: 1, lineCap: 'round' }).addTo(map);
@@ -1873,7 +1927,7 @@ function animateAll() {
 
   // fit to all
   const all = [].concat(...tracks.map(t => t.latlngs));
-  map.fitBounds(L.latLngBounds(all).pad(0.15));
+  map.fitBounds(L.latLngBounds(all).pad(0.1));
 
   animLines = tracks.map(t => L.polyline([], { color: t.color, weight: 3.5, opacity: 0.95, lineCap: 'round' }).addTo(map));
   animMarkers = tracks.map((t, i) => L.circleMarker(t.latlngs[0], { radius: 5, color: '#fff', fillColor: t.color, fillOpacity: 1, weight: 2 }).addTo(map));
@@ -2692,7 +2746,7 @@ function selectSession(id) {
   renderSidebar();
   if (state.activeSession) {
     const points = state.trackPoints[id];
-    if (points && points.length > 0) map.fitBounds(L.latLngBounds(points.map(p => [p.latitude, p.longitude])).pad(0.2));
+    if (points && points.length > 0) map.fitBounds(L.latLngBounds(points.map(p => [p.latitude, p.longitude])).pad(0.1));
   }
 }
 function setPhotoFilter(filter) { state.photoFilter = filter; drawPhotos(); renderSidebar(); }
@@ -2959,6 +3013,53 @@ function restoreSession() {
   } catch (e) {}
 }
 
+// ─── SITE PASSWORD GATE ──────────────────────────
+// A full-screen password gate guards the whole viewer. init() (which creates the
+// map + loads data) is not called until the gate is cleared, so nothing loads behind it.
+// Auth is remembered for the browser session via sessionStorage so a refresh skips the gate.
+const SITE_PASSWORD = 'UP2026!';
+let appStarted = false;
+function startApp() {
+  if (appStarted) return;   // never boot the app twice
+  appStarted = true;
+  init();
+}
+function submitGate(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  const input = document.getElementById('gate-input');
+  const err = document.getElementById('gate-error');
+  if (input.value === SITE_PASSWORD) {
+    try { sessionStorage.setItem('up_gate', 'ok'); } catch (e) {}
+    if (err) err.textContent = '';
+    dismissGate();
+  } else {
+    if (err) err.textContent = 'Incorrect password';
+    input.value = '';
+    input.focus();
+  }
+  return false;   // never submit the form / reload
+}
+function dismissGate() {
+  const gate = document.getElementById('gate');
+  if (gate) {
+    gate.classList.add('hidden');
+    setTimeout(() => { gate.style.display = 'none'; }, 400);
+  }
+  startApp();
+}
+function bootGate() {
+  let authed = false;
+  try { authed = sessionStorage.getItem('up_gate') === 'ok'; } catch (e) {}
+  const gate = document.getElementById('gate');
+  if (authed) {
+    if (gate) gate.style.display = 'none';
+    startApp();
+  } else {
+    const input = document.getElementById('gate-input');
+    if (input) input.focus();
+  }
+}
+
 // ─── INIT ────────────────────────────────────────
 async function init() {
   restoreTheme();
@@ -2996,7 +3097,7 @@ document.getElementById('demo-overlay').addEventListener('click', e => {
   if (e.target.id === 'demo-overlay') closeDemo();
 });
 
-init();
+bootGate();
 </script>
 </body>
 </html>
